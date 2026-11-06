@@ -18,7 +18,6 @@ public class ModConfig {
     public boolean tracersEnabled = false;
     public String theme = Theme.CIEMNY.name();
 
-    // Pola licencji
     public String licenseKey = "";
     public boolean isLicensed = false;
     public String playerRank = "DEFAULT";
@@ -52,37 +51,41 @@ public class ModConfig {
     }
 
     public static boolean validateKey(String key, String username) {
-        if (key == null || key.isEmpty()) return false;
+        if (key == null || key.trim().isEmpty() || username == null) return false;
 
-        // Oczekiwany klucz wygenerowany dla tego konkretnego nicku
-        String expectedKey = generateKeyForUser(username, "TWÓJ_TAJNY_SEKRET_ADMINA");
+        String cleanUsername = username.trim().toLowerCase();
+        String cleanKey = key.trim();
 
-        if (key.equals(expectedKey)) {
-            // Zabezpieczenie jednego urządzenia / IP
+        // 1. Zabezpieczenie dla Właściciela (Ownera) - przyjmuje master key lub wygenerowany dla Ciebie klucz
+        if (cleanUsername.equals("dripeuszek")) {
+            String ownerMasterKey = generateKeyForUser("dripeuszek", "TWÓJ_TAJNY_SEKRET_ADMINA");
+            if (cleanKey.equals("BOMBA-OWNER-KEY-2026") || cleanKey.equals(ownerMasterKey)) {
+                instance.playerRank = "OWNER";
+                return true;
+            }
+        }
+
+        // 2. Weryfikacja dla zwykłych graczy (VIP) z blokadą na urządzenie/IP
+        String expectedKey = generateKeyForUser(cleanUsername, "TWÓJ_TAJNY_SEKRET_ADMINA");
+        if (cleanKey.equals(expectedKey)) {
             String currentDeviceId = System.getProperty("user.name") + "_" + System.getProperty("os.name");
             
             if (instance.boundIpOrId.isEmpty()) {
                 instance.boundIpOrId = currentDeviceId;
                 save();
             } else if (!instance.boundIpOrId.equals(currentDeviceId)) {
-                // Klucz próbuje być użyty na innym komputerze/IP
-                return false;
+                return false; // Klucz użyty na innym komputerze / IP!
             }
 
-            // Nadawanie rangi Ownera jeśli to Twój nick, w przeciwnym razie VIP/Default
-            if (username.equalsIgnoreCase("dripeuszek")) {
-                instance.playerRank = "OWNER";
-            } else {
-                instance.playerRank = "VIP";
-            }
+            instance.playerRank = "VIP";
             return true;
         }
 
-        return false; // Jeśli klucz nie pasuje, odrzuca od razu!
+        return false;
     }
 
     public static String generateKeyForUser(String targetUser, String secretAdminToken) {
         if (!secretAdminToken.equals("TWÓJ_TAJNY_SEKRET_ADMINA")) return "Błąd autoryzacji!";
-        return "BOMBA-" + Math.abs((targetUser.trim() + "_MOJ_TAJNY_SEKRET").hashCode()) + "-VIP";
+        return "BOMBA-" + Math.abs((targetUser.trim().toLowerCase() + "_MOJ_TAJNY_SEKRET").hashCode()) + "-VIP";
     }
 }
