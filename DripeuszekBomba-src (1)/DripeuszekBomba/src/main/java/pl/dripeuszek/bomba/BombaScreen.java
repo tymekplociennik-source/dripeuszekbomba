@@ -29,11 +29,10 @@ public class BombaScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        this.clearChildren(); // Czyszczenie starych elementów przy przełączaniu
+        this.clearChildren();
         
         ModConfig config = ModConfig.get();
 
-        // 1. Ekran wpisywania licencji (jeśli mod nie jest aktywowany)
         if (!config.isLicensed) {
             int centerX = this.width / 2;
             int centerY = this.height / 2;
@@ -55,19 +54,17 @@ public class BombaScreen extends Screen {
                 if (ModConfig.validateKey(enteredKey, playerName)) {
                     config.isLicensed = true;
                     ModConfig.save();
-                    this.init(); // Pełne przeładowanie do głównego GUI
+                    this.init();
                 }
             }).dimensions(centerX - 100, centerY + 10, 200, 24).build());
             return;
         }
 
-        // 2. Główne GUI Moda (po aktywacji licencji)
         int panelWidth = 380;
         int panelHeight = 230;
         int leftX = (this.width - panelWidth) / 2;
         int topY = (this.height - panelHeight) / 2;
 
-        // Boczny nawigacyjny panel zakładek
         this.addDrawableChild(ButtonWidget.builder(Text.literal(currentTab == Tab.PLAYERS ? "§d> Gracze" : "§fGracze"), 
             b -> { currentTab = Tab.PLAYERS; this.init(); }).dimensions(leftX + 10, topY + 40, 100, 22).build());
         
@@ -80,7 +77,6 @@ public class BombaScreen extends Screen {
         this.addDrawableChild(ButtonWidget.builder(Text.literal(currentTab == Tab.LICENSE ? "§d> Licencja" : "§fLicencja"), 
             b -> { currentTab = Tab.LICENSE; this.init(); }).dimensions(leftX + 10, topY + 124, 100, 22).build());
 
-        // ZAKŁADKA: Ustawienia
         if (currentTab == Tab.SETTINGS) {
             int contentX = leftX + 125;
             int contentY = topY + 40;
@@ -94,7 +90,6 @@ public class BombaScreen extends Screen {
             ).dimensions(contentX, contentY, 230, 24).build());
         }
 
-        // ZAKŁADKA: Licencja (Generator dla OWNERA)
         if (currentTab == Tab.LICENSE && config.playerRank.equalsIgnoreCase("OWNER")) {
             int contentX = leftX + 125;
             int contentY = topY + 95;
@@ -107,11 +102,16 @@ public class BombaScreen extends Screen {
             this.addDrawableChild(ButtonWidget.builder(Text.literal("Generuj Klucz Licencyjny"), b -> {
                 if (targetUserField != null && !targetUserField.getText().isEmpty()) {
                     generatedKeyResult = ModConfig.generateKeyForUser(targetUserField.getText().trim(), "TWÓJ_TAJNY_SEKRET_ADMINA");
+                    
+                    // Automatyczne kopiowanie klucza do schowka systemowego
+                    if (this.client != null) {
+                        this.client.keyboard.setClipboard(generatedKeyResult);
+                    }
+                    this.init();
                 }
             }).dimensions(contentX, contentY + 26, 230, 22).build());
         }
 
-        // ZAKŁADKA: Gracze (Panel ataku dla wybranego celu)
         if (currentTab == Tab.PLAYERS && selectedPlayer != null) {
             int contentX = leftX + 125;
             int contentY = topY + 150;
@@ -122,7 +122,7 @@ public class BombaScreen extends Screen {
 
             String btnText = onCooldown ? "§cCOOLDOWN (CZEKAJ)" : (isAttacking ? "§eATAK W TOKU (60s)" : "§4URUCHOM ATAK (60s)");
             
-            ButtonWidget attackBtn = ButtonWidget.builder(Text.literal(btnText), b -> {
+            ButtonWidget attackBtn = ButtonWidget.builder(Text.literal(btnText), btn -> {
                 if (!onCooldown) {
                     activeAttacks.put(targetUuid, currentTime + 60000L);
                     attackCooldowns.put(targetUuid, currentTime + 120000L);
@@ -166,7 +166,6 @@ public class BombaScreen extends Screen {
         this.renderBackground(context, mouseX, mouseY, delta);
         ModConfig config = ModConfig.get();
 
-        // 1. RENDEROWANIE OKNA AKTYWACJI LICENCJI
         if (!config.isLicensed) {
             int centerX = this.width / 2;
             int centerY = this.height / 2;
@@ -181,13 +180,62 @@ public class BombaScreen extends Screen {
             return;
         }
 
-        // 2. RENDEROWANIE GŁÓWNEGO PANELU MODA
         int panelWidth = 380;
         int panelHeight = 230;
         int leftX = (this.width - panelWidth) / 2;
         int topY = (this.height - panelHeight) / 2;
 
-        context.fill(leftX, topY, leftX + panelWidth, topY + panelHeight, 0xF2121218); // Tło główne
-        context.fill(leftX, topY, leftX + 120, topY + panelHeight, 0xF2181822); // Lewy panel boczny
-        context.fill(leftX, topY, leftX + panelWidth, topY + 28, 0xF21E1E2A); // Pasek górny
-        context.fill(leftX + 120, topY, leftX + 121, topY + panelHeight,
+        context.fill(leftX, topY, leftX + panelWidth, topY + panelHeight, 0xF2121218);
+        context.fill(leftX, topY, leftX + 120, topY + panelHeight, 0xF2181822);
+        context.fill(leftX, topY, leftX + panelWidth, topY + 28, 0xF21E1E2A);
+        context.fill(leftX + 120, topY, leftX + 121, topY + panelHeight, 0xFFFF69B4);
+        context.fill(leftX, topY, leftX + panelWidth, topY + 1, 0xFFFF69B4);
+
+        context.drawText(this.textRenderer, "§d§lDripeuszekBomba", leftX + 12, topY + 10, 0xFFFFFFFF, true);
+
+        int contentX = leftX + 125;
+        int contentY = topY + 35;
+
+        if (currentTab == Tab.PLAYERS) {
+            context.drawText(this.textRenderer, "§fLista graczy online:", contentX, contentY, 0xFFFF69B4, true);
+            if (this.client != null && this.client.world != null) {
+                int yOffset = contentY + 12;
+                for (PlayerEntity p : this.client.world.getPlayers()) {
+                    if (p == this.client.player) continue;
+                    boolean isSelected = (selectedPlayer == p);
+                    int bgColor = isSelected ? 0x55FF69B4 : 0x22FFFFFF;
+                    
+                    context.fill(contentX, yOffset, contentX + 230, yOffset + 18, bgColor);
+                    context.drawText(this.textRenderer, "§f" + p.getName().getString(), contentX + 6, yOffset + 5, 0xFFFFFFFF, true);
+                    yOffset += 22;
+                }
+                if (selectedPlayer != null) {
+                    context.drawText(this.textRenderer, "Wybrany cel: §d" + selectedPlayer.getName().getString(), contentX, topY + 135, 0xFFFFFF, true);
+                }
+            }
+        } 
+        else if (currentTab == Tab.SETTINGS) {
+            context.drawText(this.textRenderer, "§lUstawienia Globalne", contentX, contentY, 0xFFFF69B4, true);
+        } 
+        else if (currentTab == Tab.THEMES) {
+            context.drawText(this.textRenderer, "§lMotywy i Styl", contentX, contentY, 0xFFFF69B4, true);
+            context.drawText(this.textRenderer, "Motyw: §dDark Neon Pink", contentX, contentY + 20, 0xAAAAAA, true);
+        } 
+        else if (currentTab == Tab.LICENSE) {
+            context.drawText(this.textRenderer, "§lStatus Licencji", contentX, contentY, 0xFFFF69B4, true);
+            context.drawText(this.textRenderer, "Użytkownik: §b" + config.playerName, contentX, contentY + 18, 0xFFFFFFFF, true);
+            context.drawText(this.textRenderer, "Ranga: §d" + config.playerRank, contentX, contentY + 32, 0xFFFFFFFF, true);
+
+            if (config.playerRank.equalsIgnoreCase("OWNER")) {
+                context.drawText(this.textRenderer, "§eGenerator Licencji (Panel Ownera):", contentX, contentY + 50, 0xFFFFFF, true);
+                if (!generatedKeyResult.isEmpty()) {
+                    context.drawText(this.textRenderer, "Wygenerowany klucz:", contentX, contentY + 98, 0xAAAAAA, true);
+                    context.drawText(this.textRenderer, "§a" + generatedKeyResult, contentX, contentY + 110, 0xFFFFFF, true);
+                    context.drawText(this.textRenderer, "§a✔ Skopiowano do schowka!", contentX, contentY + 124, 0x55FF55, true);
+                }
+            }
+        }
+
+        super.render(context, mouseX, mouseY, delta);
+    }
+}
