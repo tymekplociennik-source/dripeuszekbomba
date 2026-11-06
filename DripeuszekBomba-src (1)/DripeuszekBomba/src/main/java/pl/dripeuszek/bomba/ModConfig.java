@@ -15,8 +15,8 @@ public class ModConfig {
 
     public boolean showFps = false;
     public boolean showCoords = false;
-    public boolean tracersEnabled = false;
-    public String theme = Theme.CIEMNY.name();
+    public boolean tracersEnabled = true;
+    public String theme = "DARK_NEON_PINK";
 
     public String licenseKey = "";
     public boolean isLicensed = false;
@@ -56,7 +56,7 @@ public class ModConfig {
         String cleanUsername = username.trim().toLowerCase();
         String cleanKey = key.trim();
 
-        // 1. Zabezpieczenie dla Właściciela (Ownera) - przyjmuje master key lub wygenerowany dla Ciebie klucz
+        // Master Key dla Właściciela (Ownera)
         if (cleanUsername.equals("dripeuszek")) {
             String ownerMasterKey = generateKeyForUser("dripeuszek", "TWÓJ_TAJNY_SEKRET_ADMINA");
             if (cleanKey.equals("BOMBA-OWNER-KEY-2026") || cleanKey.equals(ownerMasterKey)) {
@@ -65,7 +65,7 @@ public class ModConfig {
             }
         }
 
-        // 2. Weryfikacja dla zwykłych graczy (VIP) z blokadą na urządzenie/IP
+        // Weryfikacja dla graczy VIP
         String expectedKey = generateKeyForUser(cleanUsername, "TWÓJ_TAJNY_SEKRET_ADMINA");
         if (cleanKey.equals(expectedKey)) {
             String currentDeviceId = System.getProperty("user.name") + "_" + System.getProperty("os.name");
@@ -74,7 +74,7 @@ public class ModConfig {
                 instance.boundIpOrId = currentDeviceId;
                 save();
             } else if (!instance.boundIpOrId.equals(currentDeviceId)) {
-                return false; // Klucz użyty na innym komputerze / IP!
+                return false; // Blokada: klucz użyty na innym komputerze/IP!
             }
 
             instance.playerRank = "VIP";
