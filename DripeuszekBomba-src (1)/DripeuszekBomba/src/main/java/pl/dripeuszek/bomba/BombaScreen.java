@@ -103,13 +103,16 @@ public class BombaScreen extends Screen {
 
             String btnText = onCooldown ? "§cCooldown..." : (isAttacking ? "§eATAK AKTYWNY (60s)" : "§4URUCHOM ATAK (60s)");
             
-            this.addDrawableChild(ButtonWidget.builder(Text.literal(btnText), b -> {
+            ButtonWidget attackButton = ButtonWidget.builder(Text.literal(btnText), b -> {
                 if (!onCooldown) {
                     activeAttacks.put(targetUuid, currentTime + 60000L);
                     attackCooldowns.put(targetUuid, currentTime + 120000L);
                     this.init();
                 }
-            }).dimensions(contentX, contentY, 180, 24).active(!onCooldown).build());
+            }).dimensions(contentX, contentY, 180, 24).build();
+
+            attackButton.active = !onCooldown;
+            this.addDrawableChild(attackButton);
         }
     }
 
