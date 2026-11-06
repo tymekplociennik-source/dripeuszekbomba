@@ -23,6 +23,7 @@ public class ModConfig {
     public boolean isLicensed = false;
     public String playerRank = "DEFAULT";
     public String playerName = "Player";
+    public String boundIpOrId = ""; // Zabezpieczenie: klucz przypisany do konkretnego urządzenia/IP
 
     public static ModConfig get() {
         return instance;
@@ -34,7 +35,6 @@ public class ModConfig {
                 ModConfig loaded = GSON.fromJson(Files.readString(FILE), ModConfig.class);
                 if (loaded != null) {
                     instance = loaded;
-                    // Automatyczna walidacja przy wczytaniu
                     instance.isLicensed = validateKey(instance.licenseKey, instance.playerName);
                 }
             }
@@ -52,15 +52,28 @@ public class ModConfig {
     }
 
     public static boolean validateKey(String key, String username) {
-        // Jeśli to Ty, zawsze dostajesz OWNER i pełny dostęp
+        if (key == null || key.isEmpty()) return false;
+
+        // Twoje konto OWNER ma zawsze dostęp
         if (username.equalsIgnoreCase("dripeuszek")) {
             instance.playerRank = "OWNER";
             return true;
         }
 
-        // Walidacja klucza dla innych graczy
+        // Sprawdzenie poprawności klucza wygenerowanego dla gracza
         String expectedKey = "BOMBA-" + Math.abs((username + "_MOJ_TAJNY_SEKRET").hashCode()) + "-VIP";
         if (key.equals(expectedKey)) {
+            // Blokada jednego IP / urządzenia: jeśli klucz nie był jeszcze nigdzie przypisany lub jest przypisany do nas
+            String currentDeviceId = System.getProperty("user.name") + "_" + System.getProperty("os.name");
+            
+            if (instance.boundIpOrId.isEmpty()) {
+                instance.boundIpOrId = currentDeviceId; // Przypisuje do pierwszego lepszego IP/urządzenia
+                save();
+            } else if (!instance.boundIpOrId.equals(currentDeviceId)) {
+                // Klucz był już użyty na innym urządzeniu/IP!
+                return false;
+            }
+
             instance.playerRank = "DEFAULT";
             return true;
         }
