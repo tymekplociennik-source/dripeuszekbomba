@@ -6,7 +6,7 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.entity.player.PlayerEntity;
 import java.util.UUID;
 
-public class DripeuszekBomba implements ClientModInitializer {
+public class DripeuszekBombaClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         // Rejestracja zdarzenia renderowania świata (Tracers i bomby nad głową)
