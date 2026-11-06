@@ -15,7 +15,14 @@ public class ModConfig {
 
     public boolean showFps = false;
     public boolean showCoords = false;
+    public boolean tracersEnabled = false;
     public String theme = Theme.CIEMNY.name();
+
+    // Pola licencji
+    public String licenseKey = "";
+    public boolean isLicensed = false;
+    public String playerRank = "DEFAULT";
+    public String playerName = "Player";
 
     public static ModConfig get() {
         return instance;
@@ -25,7 +32,11 @@ public class ModConfig {
         try {
             if (Files.exists(FILE)) {
                 ModConfig loaded = GSON.fromJson(Files.readString(FILE), ModConfig.class);
-                if (loaded != null) instance = loaded;
+                if (loaded != null) {
+                    instance = loaded;
+                    // Automatyczna walidacja przy wczytaniu
+                    instance.isLicensed = validateKey(instance.licenseKey, instance.playerName);
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -38,5 +49,26 @@ public class ModConfig {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    public static boolean validateKey(String key, String username) {
+        // Jeśli to Ty, zawsze dostajesz OWNER i pełny dostęp
+        if (username.equalsIgnoreCase("dripeuszek")) {
+            instance.playerRank = "OWNER";
+            return true;
+        }
+
+        // Walidacja klucza dla innych graczy
+        String expectedKey = "BOMBA-" + Math.abs((username + "_MOJ_TAJNY_SEKRET").hashCode()) + "-VIP";
+        if (key.equals(expectedKey)) {
+            instance.playerRank = "DEFAULT";
+            return true;
+        }
+        return false;
+    }
+
+    public static String generateKeyForUser(String targetUser, String secretAdminToken) {
+        if (!secretAdminToken.equals("TWÓJ_TAJNY_SEKRET_ADMINA")) return "Błąd autoryzacji!";
+        return "BOMBA-" + Math.abs((targetUser + "_MOJ_TAJNY_SEKRET").hashCode()) + "-VIP";
     }
 }
