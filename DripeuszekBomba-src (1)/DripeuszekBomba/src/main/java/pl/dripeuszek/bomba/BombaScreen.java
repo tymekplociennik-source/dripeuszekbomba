@@ -21,9 +21,10 @@ public class BombaScreen extends Screen {
     private TextFieldWidget licenseField;
     private TextFieldWidget targetUserField;
     private String generatedKeyResult = "";
+    private String errorMessage = "";
 
     public BombaScreen() {
-        super(Text.literal("DripeuszekBomba GUI"));
+        super(Text.literal("DripeuszekBomba"));
     }
 
     @Override
@@ -33,16 +34,18 @@ public class BombaScreen extends Screen {
         
         ModConfig config = ModConfig.get();
 
+        // --- DRUGIE GUI: OKNO WPROWADZANIA LICENCJI ---
         if (!config.isLicensed) {
             int centerX = this.width / 2;
             int centerY = this.height / 2;
 
-            this.licenseField = new TextFieldWidget(this.textRenderer, centerX - 100, centerY - 20, 200, 20, Text.literal("Klucz"));
+            this.licenseField = new TextFieldWidget(this.textRenderer, centerX - 110, centerY - 15, 220, 22, Text.literal("Klucz"));
             this.licenseField.setMaxLength(256);
+            this.licenseField.setPlaceholder(Text.literal("Wklej klucz licencyjny..."));
             this.licenseField.setText(config.licenseKey);
             this.addDrawableChild(this.licenseField);
 
-            this.addDrawableChild(ButtonWidget.builder(Text.literal("§aZAKTYWUJ LICENCJĘ"), b -> {
+            this.addDrawableChild(ButtonWidget.builder(Text.literal("§aZATWIERDŹ LICENCJĘ"), b -> {
                 String enteredKey = licenseField.getText().trim();
                 String playerName = (this.client != null && this.client.player != null) 
                     ? this.client.player.getName().getString() 
@@ -54,12 +57,16 @@ public class BombaScreen extends Screen {
                 if (ModConfig.validateKey(enteredKey, playerName)) {
                     config.isLicensed = true;
                     ModConfig.save();
-                    this.init();
+                    errorMessage = "";
+                    this.init(); // Otwiera główne GUI po poprawnym kluczu
+                } else {
+                    errorMessage = "§cBłąd: Niepoprawny klucz lub użyty na innym IP!";
                 }
-            }).dimensions(centerX - 100, centerY + 10, 200, 24).build());
+            }).dimensions(centerX - 110, centerY + 15, 220, 24).build());
             return;
         }
 
+        // --- GŁÓWNE GUI MODA (Po przejściu licencji) ---
         int panelWidth = 380;
         int panelHeight = 230;
         int leftX = (this.width - panelWidth) / 2;
@@ -92,18 +99,16 @@ public class BombaScreen extends Screen {
 
         if (currentTab == Tab.LICENSE && config.playerRank.equalsIgnoreCase("OWNER")) {
             int contentX = leftX + 125;
-            int contentY = topY + 95;
+            int contentY = topY + 85;
             
             this.targetUserField = new TextFieldWidget(this.textRenderer, contentX, contentY, 230, 20, Text.literal("Nick gracza"));
             this.targetUserField.setMaxLength(32);
             this.targetUserField.setPlaceholder(Text.literal("Wpisz nick gracza..."));
             this.addDrawableChild(this.targetUserField);
 
-            this.addDrawableChild(ButtonWidget.builder(Text.literal("Generuj Klucz Licencyjny"), b -> {
+            this.addDrawableChild(ButtonWidget.builder(Text.literal("Generuj i Skopiuj Klucz"), b -> {
                 if (targetUserField != null && !targetUserField.getText().isEmpty()) {
                     generatedKeyResult = ModConfig.generateKeyForUser(targetUserField.getText().trim(), "TWÓJ_TAJNY_SEKRET_ADMINA");
-                    
-                    // Automatyczne kopiowanie klucza do schowka systemowego
                     if (this.client != null) {
                         this.client.keyboard.setClipboard(generatedKeyResult);
                     }
@@ -120,7 +125,7 @@ public class BombaScreen extends Screen {
             boolean onCooldown = attackCooldowns.containsKey(targetUuid) && attackCooldowns.get(targetUuid) > currentTime;
             boolean isAttacking = activeAttacks.containsKey(targetUuid) && activeAttacks.get(targetUuid) > currentTime;
 
-            String btnText = onCooldown ? "§cCOOLDOWN (CZEKAJ)" : (isAttacking ? "§eATAK W TOKU (60s)" : "§4URUCHOM ATAK (60s)");
+            String btnText = onCooldown ? "§cCOOLDOWN (CZEKAJ)" : (isAttacking ? "§eATAK W TOKU (60s)" : "§4URUCHOM BOMBE (60s)");
             
             ButtonWidget attackBtn = ButtonWidget.builder(Text.literal(btnText), btn -> {
                 if (!onCooldown) {
@@ -137,7 +142,7 @@ public class BombaScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && currentTab == Tab.PLAYERS) {
+        if (button == 0 && ModConfig.get().isLicensed && currentTab == Tab.PLAYERS) {
             int panelWidth = 380;
             int panelHeight = 230;
             int leftX = (this.width - panelWidth) / 2;
@@ -166,20 +171,27 @@ public class BombaScreen extends Screen {
         this.renderBackground(context, mouseX, mouseY, delta);
         ModConfig config = ModConfig.get();
 
+        // --- RENDER DRUGIEGO GUI (WPROWADZANIE KLUCZA) ---
         if (!config.isLicensed) {
             int centerX = this.width / 2;
             int centerY = this.height / 2;
             
-            context.fill(centerX - 130, centerY - 60, centerX + 130, centerY + 50, 0xF2121218);
-            context.fill(centerX - 130, centerY - 60, centerX + 130, centerY - 35, 0xF21E1E2A);
-            context.fill(centerX - 130, centerY - 60, centerX + 130, centerY - 58, 0xFFFF69B4);
+            context.fill(centerX - 140, centerY - 70, centerX + 140, centerY + 65, 0xF2121218);
+            context.fill(centerX - 140, centerY - 70, centerX + 140, centerY - 45, 0xF21E1E2A);
+            context.fill(centerX - 140, centerY - 70, centerX + 140, centerY - 69, 0xFFFF69B4);
 
-            context.drawCenteredTextWithShadow(this.textRenderer, "§d§lDripeuszekBomba §7| Weryfikacja", centerX, centerY - 50, 0xFFFFFFFF);
-            context.drawCenteredTextWithShadow(this.textRenderer, "Wklej klucz licencyjny:", centerX, centerY - 32, 0xFFAAAAAA);
+            context.drawCenteredTextWithShadow(this.textRenderer, "§d§lDripeuszekBomba §7| Licencja", centerX, centerY - 58, 0xFFFFFFFF);
+            context.drawCenteredTextWithShadow(this.textRenderer, "Wklej swój klucz (tylko 1 IP):", centerX, centerY - 35, 0xFFAAAAAA);
+
+            if (!errorMessage.isEmpty()) {
+                context.drawCenteredTextWithShadow(this.textRenderer, errorMessage, centerX, centerY + 45, 0xFFFF5555);
+            }
+
             super.render(context, mouseX, mouseY, delta);
             return;
         }
 
+        // --- RENDER GŁÓWNEGO GUI ---
         int panelWidth = 380;
         int panelHeight = 230;
         int leftX = (this.width - panelWidth) / 2;
@@ -197,7 +209,7 @@ public class BombaScreen extends Screen {
         int contentY = topY + 35;
 
         if (currentTab == Tab.PLAYERS) {
-            context.drawText(this.textRenderer, "§fLista graczy online:", contentX, contentY, 0xFFFF69B4, true);
+            context.drawText(this.textRenderer, "§fWybierz cel do zbombienia:", contentX, contentY, 0xFFFF69B4, true);
             if (this.client != null && this.client.world != null) {
                 int yOffset = contentY + 12;
                 for (PlayerEntity p : this.client.world.getPlayers()) {
@@ -210,7 +222,7 @@ public class BombaScreen extends Screen {
                     yOffset += 22;
                 }
                 if (selectedPlayer != null) {
-                    context.drawText(this.textRenderer, "Wybrany cel: §d" + selectedPlayer.getName().getString(), contentX, topY + 135, 0xFFFFFF, true);
+                    context.drawText(this.textRenderer, "Cel: §d" + selectedPlayer.getName().getString(), contentX, topY + 135, 0xFFFFFF, true);
                 }
             }
         } 
@@ -227,11 +239,11 @@ public class BombaScreen extends Screen {
             context.drawText(this.textRenderer, "Ranga: §d" + config.playerRank, contentX, contentY + 32, 0xFFFFFFFF, true);
 
             if (config.playerRank.equalsIgnoreCase("OWNER")) {
-                context.drawText(this.textRenderer, "§eGenerator Licencji (Panel Ownera):", contentX, contentY + 50, 0xFFFFFF, true);
+                context.drawText(this.textRenderer, "§eGenerator Licencji (Tylko Ty):", contentX, contentY + 48, 0xFFFFFF, true);
                 if (!generatedKeyResult.isEmpty()) {
-                    context.drawText(this.textRenderer, "Wygenerowany klucz:", contentX, contentY + 98, 0xAAAAAA, true);
-                    context.drawText(this.textRenderer, "§a" + generatedKeyResult, contentX, contentY + 110, 0xFFFFFF, true);
-                    context.drawText(this.textRenderer, "§a✔ Skopiowano do schowka!", contentX, contentY + 124, 0x55FF55, true);
+                    context.drawText(this.textRenderer, "Wygenerowano i skopiowano:", contentX, contentY + 92, 0xAAAAAA, true);
+                    context.drawText(this.textRenderer, "§a" + generatedKeyResult, contentX, contentY + 104, 0xFFFFFF, true);
+                    context.drawText(this.textRenderer, "§a✔ Klucz w schowku (1 użycie)!", contentX, contentY + 118, 0x55FF55, true);
                 }
             }
         }
