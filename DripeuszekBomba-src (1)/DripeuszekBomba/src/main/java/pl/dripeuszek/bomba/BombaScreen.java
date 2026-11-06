@@ -15,7 +15,6 @@ public class BombaScreen extends Screen {
     public enum Tab { PLAYERS, SETTINGS, THEMES, LICENSE }
     private Tab currentTab = Tab.PLAYERS;
 
-    // Publiczne mapy, aby system renderowania w świecie gry (tracers / tekst nad głową) miał do nich dostęp
     public static final HashMap<UUID, Long> attackCooldowns = new HashMap<>();
     public static final HashMap<UUID, Long> activeAttacks = new HashMap<>();
     private PlayerEntity selectedPlayer = null;
@@ -24,7 +23,6 @@ public class BombaScreen extends Screen {
     private TextFieldWidget targetUserField;
     private String generatedKeyResult = "";
     private String errorMessage = "";
-
     private float animationProgress = 0.0f;
 
     public BombaScreen() {
@@ -77,7 +75,7 @@ public class BombaScreen extends Screen {
         int leftX = (this.width - panelWidth) / 2;
         int topY = (this.height - panelHeight) / 2;
 
-        // Menu boczne zakładek
+        // Zakładki boczne
         this.addDrawableChild(ButtonWidget.builder(Text.literal(currentTab == Tab.PLAYERS ? "§d⚡ Gracze" : "§fGracze"), 
             b -> { playClickSound(1.0f); currentTab = Tab.PLAYERS; this.init(); }).dimensions(leftX + 12, topY + 45, 100, 24).build());
         
@@ -127,9 +125,9 @@ public class BombaScreen extends Screen {
             }).dimensions(contentX, contentY + 26, 280, 22).build());
         }
 
-        // --- PRZYCISK ATAKU W PRAWYM PANELU (ZAKŁADKA GRACZE) ---
+        // Przycisk ataku w prawym panelu
         if (currentTab == Tab.PLAYERS && selectedPlayer != null) {
-            int rightPanelX = leftX + 265; // Prawa kolumna w gui
+            int rightPanelX = leftX + 265;
             int contentY = topY + 130;
             UUID targetUuid = selectedPlayer.getUuid();
             long currentTime = System.currentTimeMillis();
@@ -143,8 +141,8 @@ public class BombaScreen extends Screen {
                     if (this.client != null && this.client.player != null) {
                         this.client.player.playSound(SoundEvents.ENTITY_GENERIC_EXPLODE.value(), 0.5f, 1.0f);
                     }
-                    activeAttacks.put(targetUuid, currentTime + 60000L); // 60 sekund ataku
-                    attackCooldowns.put(targetUuid, currentTime + 120000L); // 120 sekund cooldownu
+                    activeAttacks.put(targetUuid, currentTime + 60000L); // 60s bomby
+                    attackCooldowns.put(targetUuid, currentTime + 120000L); // 120s cooldownu
                     this.init();
                 }
             }).dimensions(rightPanelX, contentY, 145, 28).build();
@@ -174,7 +172,6 @@ public class BombaScreen extends Screen {
                 int yOffset = listY;
                 for (PlayerEntity p : this.client.world.getPlayers()) {
                     if (p == this.client.player) continue;
-                    // Kliknięcie w element listy graczy (szerokość 135 px)
                     if (mouseX >= listX && mouseX <= listX + 135 && mouseY >= yOffset && mouseY <= yOffset + 20) {
                         playClickSound(1.5f);
                         selectedPlayer = p;
@@ -224,7 +221,7 @@ public class BombaScreen extends Screen {
 
         context.fill(leftX - 2, topY - 2, leftX + panelWidth + 2, topY + panelHeight + 2, 0x33FF69B4);
         context.fill(leftX, topY, leftX + panelWidth, topY + panelHeight, 0xF50D0D14);
-        context.fill(leftX, topY, leftX + 115, topY + panelHeight, 0xF814141E); // Lewe menu zakładek
+        context.fill(leftX, topY, leftX + 115, topY + panelHeight, 0xF814141E);
         context.fill(leftX, topY, leftX + panelWidth, topY + 32, 0xF81A1A26);
         context.fill(leftX + 115, topY, leftX + 116, topY + panelHeight, 0xFFFF69B4);
         context.fill(leftX, topY, leftX + panelWidth, topY + 1, 0xFFFF69B4);
@@ -235,7 +232,6 @@ public class BombaScreen extends Screen {
         int contentX = leftX + 125;
         int contentY = topY + 45;
 
-        // --- ZAKŁADKA GRACZE (LISTA PO LEWEJ, PANEL INFORMACYJNY PO PRAWEJ) ---
         if (currentTab == Tab.PLAYERS) {
             context.drawText(this.textRenderer, "§f🎯 Gracze:", contentX, contentY - 10, 0xFFFF69B4, true);
             if (this.client != null && this.client.world != null) {
@@ -250,7 +246,7 @@ public class BombaScreen extends Screen {
                     yOffset += 24;
                 }
 
-                // RENDEROWANIE PANELU SZCZEGÓŁÓW PO PRAWEJ STRONIE
+                // Prawy panel informacyjny
                 int rightPanelX = leftX + 265;
                 context.fill(rightPanelX - 5, contentY - 15, rightPanelX + 145, topY + 230, 0x331E1E2A);
                 
