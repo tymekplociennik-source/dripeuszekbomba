@@ -31,7 +31,6 @@ public class BombaScreen extends Screen {
         super.init();
         ModConfig config = ModConfig.get();
 
-        // Jeśli brak licencji -> Wyświetl okno żądające klucza
         if (!config.isLicensed) {
             int centerX = this.width / 2;
             int centerY = this.height / 2;
@@ -51,13 +50,12 @@ public class BombaScreen extends Screen {
                 if (ModConfig.validateKey(enteredKey, playerName)) {
                     config.isLicensed = true;
                     ModConfig.save();
-                    this.init(); // Odświeża ekran do normalnego GUI
+                    this.init();
                 }
             }).dimensions(centerX - 110, centerY + 15, 220, 24).build());
             return;
         }
 
-        // --- GŁÓWNE GUI ---
         int leftX = this.width / 2 - 160;
         int topY = this.height / 2 - 100;
 
@@ -66,7 +64,6 @@ public class BombaScreen extends Screen {
         this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fMotywy"), b -> { currentTab = Tab.THEMES; this.init(); }).dimensions(leftX, topY + 96, 110, 22).build());
         this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fLicencja"), b -> { currentTab = Tab.LICENSE; this.init(); }).dimensions(leftX, topY + 124, 110, 22).build());
 
-        // Ustawienia -> Tracers
         if (currentTab == Tab.SETTINGS) {
             int contentX = leftX + 130;
             int contentY = topY + 40;
@@ -80,7 +77,6 @@ public class BombaScreen extends Screen {
             ).dimensions(contentX, contentY, 180, 24).build());
         }
 
-        // Licencja -> Generator kluczy (Tylko dla Ownera)
         if (currentTab == Tab.LICENSE && config.playerRank.equals("OWNER")) {
             int contentX = leftX + 130;
             int contentY = topY + 90;
@@ -97,7 +93,6 @@ public class BombaScreen extends Screen {
             }).dimensions(contentX, contentY + 25, 180, 20).build());
         }
 
-        // Gracze -> Panel ATAK (60s ataku / 60s cooldownu)
         if (currentTab == Tab.PLAYERS && selectedPlayer != null) {
             int contentX = leftX + 130;
             int contentY = topY + 140;
@@ -110,20 +105,43 @@ public class BombaScreen extends Screen {
             
             this.addDrawableChild(ButtonWidget.builder(Text.literal(btnText), b -> {
                 if (!onCooldown) {
-                    activeAttacks.put(targetUuid, currentTime + 60000L); // 60 sekund ataku
-                    attackCooldowns.put(targetUuid, currentTime + 120000L); // 60s ataku + 60s cooldownu
+                    activeAttacks.put(targetUuid, currentTime + 60000L);
+                    attackCooldowns.put(targetUuid, currentTime + 120000L);
                     this.init();
                 }
-            }).dimensions(contentX, contentY, 180, 24).disabled(onCooldown).build());
+            }).dimensions(contentX, contentY, 180, 24).active(!onCooldown).build());
         }
     }
 
     @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && currentTab == Tab.PLAYERS) {
+            int leftX = this.width / 2 - 160;
+            int topY = this.height / 2 - 100;
+            int contentX = leftX + 135;
+            int contentY = topY + 35 + 15;
+            
+            if (this.client != null && this.client.world != null) {
+                int yOffset = contentY;
+                for (PlayerEntity p : this.client.world.getPlayers()) {
+                    if (p == this.client.player) continue;
+                    if (mouseX >= contentX && mouseX <= contentX + 175 && mouseY >= yOffset && mouseY <= yOffset + 18) {
+                        selectedPlayer = p;
+                        this.init();
+                        return true;
+                    }
+                    yOffset += 22;
+                }
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        this.renderBackground(context);
+        this.renderBackground(context, mouseX, mouseY, delta);
         ModConfig config = ModConfig.get();
 
-        // Renderowanie okna logowania licencji
         if (!config.isLicensed) {
             int centerX = this.width / 2;
             int centerY = this.height / 2;
@@ -136,7 +154,6 @@ public class BombaScreen extends Screen {
             return;
         }
 
-        // Renderowanie głównego GUI
         int leftX = this.width / 2 - 160;
         int topY = this.height / 2 - 100;
         int width = 320;
@@ -163,13 +180,6 @@ public class BombaScreen extends Screen {
                     int bgColor = isSelected ? 0x55FF69B4 : 0x22FFFFFF;
                     context.fill(contentX, yOffset, contentX + 175, yOffset + 18, bgColor);
                     context.drawText(this.textRenderer, "§f" + p.getName().getString(), contentX + 6, yOffset + 5, 0xFFFFFFFF, true);
-                    
-                    if (mouseX >= contentX && mouseX <= contentX + 175 && mouseY >= yOffset && mouseY <= yOffset + 18) {
-                        if (this.client.mouse.wasButtonReleased(0)) {
-                            selectedPlayer = p;
-                            this.init();
-                        }
-                    }
                     yOffset += 22;
                 }
                 if (selectedPlayer != null) {
