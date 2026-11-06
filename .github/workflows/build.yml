@@ -7,6 +7,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "DripeuszekBomba-src (1)/DripeuszekBomba"
     steps:
       - uses: actions/checkout@v4
 
@@ -18,6 +21,7 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.11.1
+          build-root-directory: "DripeuszekBomba-src (1)/DripeuszekBomba"
 
       - name: Build
         run: gradle build
@@ -25,4 +29,4 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: DripeuszekBomba
-          path: build/libs/*.jar
+          path: "DripeuszekBomba-src (1)/DripeuszekBomba/build/libs/*.jar"
