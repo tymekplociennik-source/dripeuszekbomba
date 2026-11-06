@@ -3,205 +3,172 @@ package pl.dripeuszek.bomba;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
-import net.minecraft.client.network.PlayerListEntry;
-import net.minecraft.text.OrderedText;
+import net.minecraft.client.gui.widget.TextFieldWidget;
 import net.minecraft.text.Text;
-import net.minecraft.util.math.MathHelper;
+import net.minecraft.entity.player.PlayerEntity;
 
-import java.util.Comparator;
-import java.util.List;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
+import java.util.HashMap;
+import java.util.UUID;
 
 public class BombaScreen extends Screen {
-    private enum Tab {
-        GRACZE("Gracze"),
-        USTAWIENIA("Ustawienia"),
-        MOTYWY("Motywy"),
-        LICENCJA("Licencja");
+    public enum Tab { PLAYERS, SETTINGS, THEMES, LICENSE }
+    private Tab currentTab = Tab.PLAYERS;
 
-        final String label;
-        Tab(String label) { this.label = label; }
-    }
+    // System ataków i cooldownów (60s ataku / 60s cooldownu)
+    private static final HashMap<UUID, Long> attackCooldowns = new HashMap<>();
+    private static final HashMap<UUID, Long> activeAttacks = new HashMap<>();
+    private PlayerEntity selectedPlayer = null;
 
-    private static final int SIDEBAR = 110;
-    private static final String LICENSE =
-            "MIT License\n\n"
-          + "Copyright (c) 2026 DripeuszekBomba\n\n"
-          + "Permission is hereby granted, free of charge, to any person obtaining a copy of this software "
-          + "and associated documentation files (the \"Software\"), to deal in the Software without restriction, "
-          + "including without limitation the rights to use, copy, modify, merge, publish, distribute, "
-          + "sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is "
-          + "furnished to do so, subject to the following conditions:\n\n"
-          + "The above copyright notice and this permission notice shall be included in all copies or "
-          + "substantial portions of the Software.\n\n"
-          + "THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT "
-          + "NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND "
-          + "NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, "
-          + "DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, "
-          + "OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
-
-    private static Tab currentTab = Tab.GRACZE;
-
-    private double scroll = 0;
-    private double maxScroll = 0;
-    private int px, py, pw, ph;
+    // Pola do generowania kluczy w zakładce Licencja (tylko dla Ownera)
+    private TextFieldWidget targetUserField;
+    private String generatedKeyResult = "";
 
     public BombaScreen() {
-        super(Text.literal("DripeuszekBomba"));
+        super(Text.literal("DripeuszekBomba Modern"));
     }
 
     @Override
     protected void init() {
-        pw = Math.min(width - 20, 440);
-        ph = Math.min(height - 20, 280);
-        px = (width - pw) / 2;
-        py = (height - ph) / 2;
+        super.init();
+        int leftX = this.width / 2 - 160;
+        int topY = this.height / 2 - 100;
 
-        // Zakładki po lewej
-        int by = py + 34;
-        for (Tab t : Tab.values()) {
-            String label = (t == currentTab ? "> " : "") + t.label;
-            addDrawableChild(ButtonWidget.builder(Text.literal(label), btn -> {
-                currentTab = t;
-                scroll = 0;
-                clearAndInit();
-            }).dimensions(px + 6, by, SIDEBAR - 12, 20).build());
-            by += 24;
+        // Przyciski zakładek po lewej stronie (nowoczesny styl)
+        this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fGracze"), b -> { currentTab = Tab.PLAYERS; this.init(); }).dimensions(leftX, topY + 40, 110, 22).build());
+        this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fUstawienia"), b -> { currentTab = Tab.SETTINGS; this.init(); }).dimensions(leftX, topY + 68, 110, 22).build());
+        this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fMotywy"), b -> { currentTab = Tab.THEMES; this.init(); }).dimensions(leftX, topY + 96, 110, 22).build());
+        this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fLicencja"), b -> { currentTab = Tab.LICENSE; this.init(); }).dimensions(leftX, topY + 124, 110, 22).build());
+
+        // Zakładka Ustawienia: Przycisk Tracers
+        if (currentTab == Tab.SETTINGS) {
+            int contentX = leftX + 130;
+            int contentY = topY + 40;
+            this.addDrawableChild(ButtonWidget.builder(
+                Text.literal("Tracers na atakowanych: " + (ModConfig.tracersEnabled ? "§aWŁĄCZONE" : "§cWYŁĄCZONE")),
+                b -> {
+                    ModConfig.tracersEnabled = !ModConfig.tracersEnabled;
+                    ModConfig.save();
+                    this.init();
+                }
+            ).dimensions(contentX, contentY, 180, 24).build());
         }
 
-        int cx = px + SIDEBAR + 12;
-        int cy = py + 34;
-        int cw = pw - SIDEBAR - 24;
-        ModConfig cfg = ModConfig.get();
+        // Zakładka Licencja: Generator kluczy (widoczny tylko jeśli jesteś OWNEREM)
+        if (currentTab == Tab.LICENSE && ModConfig.playerRank.equals("OWNER")) {
+            int contentX = leftX + 130;
+            int contentY = topY + 90;
+            
+            this.targetUserField = new TextFieldWidget(this.textRenderer, contentX, contentY, 180, 20, Text.literal("Nick gracza"));
+            this.targetUserField.setMaxLength(32);
+            this.targetUserField.setPlaceholder(Text.literal("Wpisz nick gracza..."));
+            this.addDrawableChild(this.targetUserField);
 
-        switch (currentTab) {
-            case USTAWIENIA -> {
-                addToggle(cx, cy, cw, "Pokaż FPS", () -> cfg.showFps, v -> cfg.showFps = v);
-                addToggle(cx, cy + 24, cw, "Pokaż koordynaty", () -> cfg.showCoords, v -> cfg.showCoords = v);
-            }
-            case MOTYWY -> {
-                int ty = cy;
-                for (Theme th : Theme.values()) {
-                    boolean selected = th.name().equals(cfg.theme);
-                    Text label = Text.literal((selected ? "> " : "") + th.label + (selected ? " <" : ""))
-                            .withColor(th.accent & 0xFFFFFF);
-                    addDrawableChild(ButtonWidget.builder(label, btn -> {
-                        cfg.theme = th.name();
-                        ModConfig.save();
-                        clearAndInit();
-                    }).dimensions(cx, ty, cw, 20).build());
-                    ty += 24;
+            this.addDrawableChild(ButtonWidget.builder(Text.literal("Generuj Klucz"), b -> {
+                if (targetUserField != null && !targetUserField.getText().isEmpty()) {
+                    generatedKeyResult = ModConfig.generateKeyForUser(targetUserField.getText(), "TWÓJ_TAJNY_SEKRET_ADMINA");
+                }
+            }).dimensions(contentX, contentY + 25, 180, 20).build());
+        }
+
+        // Zakładka Gracze: Przycisk panelu ATAK dla wybranego gracza
+        if (currentTab == Tab.PLAYERS && selectedPlayer != null) {
+            int contentX = leftX + 130;
+            int contentY = topY + 140;
+            UUID targetUuid = selectedPlayer.getUuid();
+            long currentTime = System.currentTimeMillis();
+            boolean onCooldown = attackCooldowns.containsKey(targetUuid) && attackCooldowns.get(targetUuid) > currentTime;
+            boolean isAttacking = activeAttacks.containsKey(targetUuid) && activeAttacks.get(targetUuid) > currentTime;
+
+            String btnText = onCooldown ? "§cCooldown..." : (isAttacking ? "§eATAK AKTYWNY (60s)" : "§4URUCHOM ATAK (60s)");
+            
+            this.addDrawableChild(ButtonWidget.builder(Text.literal(btnText), b -> {
+                if (!onCooldown) {
+                    activeAttacks.put(targetUuid, currentTime + 60000L); // Atak na 60 sekund
+                    attackCooldowns.put(targetUuid, currentTime + 120000L); // 60s ataku + 60s cooldownu
+                    this.init();
+                }
+            }).dimensions(contentX, contentY, 180, 24).disabled(onCooldown).build());
+        }
+    }
+
+    @Override
+    public void render(DrawContext context, int mouseX, int mouseY, float delta) {
+        this.renderBackground(context);
+
+        int leftX = this.width / 2 - 160;
+        int topY = this.height / 2 - 100;
+        int width = 320;
+        int height = 210;
+
+        // Nowoczesne tło główne (ciemny matowy grafit z neonową ramką w stylu Twojego moda)
+        context.fill(leftX, topY, leftX + width, topY + height, 0xF2121218); // Główne tło
+        context.fill(leftX, topY, leftX + 125, topY + height, 0xF2181822); // Panel boczny
+        context.fill(leftX, topY, leftX + width, topY + 25, 0xF21E1E2A); // Pasek górny
+
+        // Linia rozdzielająca i akcenty
+        context.fill(leftX + 125, topY, leftX + 126, topY + height, 0xFFFF69B4); // Różowa linia z Twojego motywu
+        context.fill(leftX, topY, leftX + width, topY + 1, 0xFFFF69B4);
+
+        // Nagłówek i tytuł
+        context.drawText(this.textRenderer, "§d§lDripeuszekBomba", leftX + 12, topY + 8, 0xFFFFFFFF, true);
+
+        int contentX = leftX + 135;
+        int contentY = topY + 35;
+
+        // RENDEROWANIE ZAWARTOŚCI W ZALEŻNOŚCI OD ZAKŁADKI
+        if (currentTab == Tab.PLAYERS) {
+            context.drawText(this.textRenderer, "§fOnline Gracze:", contentX, contentY, 0xFFFF69B4, true);
+            
+            if (this.client != null && this.client.world != null) {
+                int yOffset = contentY + 15;
+                for (PlayerEntity p : this.client.world.getPlayers()) {
+                    if (p == this.client.player) continue;
+                    boolean isSelected = (selectedPlayer == p);
+                    
+                    // Podświetlenie wybranego gracza
+                    int bgColor = isSelected ? 0x55FF69B4 : 0x22FFFFFF;
+                    context.fill(contentX, yOffset, contentX + 175, yOffset + 18, bgColor);
+                    
+                    context.drawText(this.textRenderer, "§f" + p.getName().getString(), contentX + 6, yOffset + 5, 0xFFFFFFFF, true);
+                    
+                    // Obsługa kliknięcia myszką w listę graczy
+                    if (mouseX >= contentX && mouseX <= contentX + 175 && mouseY >= yOffset && mouseY <= yOffset + 18) {
+                        if (this.client.mouse.wasButtonReleased(0)) {
+                            selectedPlayer = p;
+                            this.init();
+                        }
+                    }
+                    yOffset += 22;
+                }
+
+                if (selectedPlayer != null) {
+                    context.drawText(this.textRenderer, "Wybrano: §d" + selectedPlayer.getName().getString(), contentX, topY + 120, 0xFFFFFF, true);
                 }
             }
-            default -> { }
-        }
-    }
+        } 
+        else if (currentTab == Tab.SETTINGS) {
+            context.drawText(this.textRenderer, "§lUstawienia Globalne", contentX, contentY, 0xFFFF69B4, true);
+            context.drawText(this.textRenderer, "§7Tutaj zarządzasz funkcjami pomocniczymi.", contentX, contentY + 15, 0x888888, true);
+        } 
+        else if (currentTab == Tab.THEMES) {
+            context.drawText(this.textRenderer, "§lMotywy i Styl", contentX, contentY, 0xFFFF69B4, true);
+            context.drawText(this.textRenderer, "§7Aktywny motyw: §dDark Neon Pink", contentX, contentY + 15, 0xAAAAAA, true);
+        } 
+        else if (currentTab == Tab.LICENSE) {
+            context.drawText(this.textRenderer, "§lPanel Licencji", contentX, contentY, 0xFFFF69B4, true);
+            context.drawText(this.textRenderer, "Nick: §b" + ModConfig.playerName, contentX, contentY + 20, 0xFFFFFFFF, true);
+            context.drawText(this.textRenderer, "Ranga: §d" + ModConfig.playerRank, contentX, contentY + 35, 0xFFFFFFFF, true);
+            context.drawText(this.textRenderer, "Status: §aZweryfikowana", contentX, contentY + 50, 0xFFFFFFFF, true);
 
-    private void addToggle(int x, int y, int w, String label, BooleanSupplier get, Consumer<Boolean> set) {
-        addDrawableChild(ButtonWidget.builder(toggleText(label, get.getAsBoolean()), btn -> {
-            boolean now = !get.getAsBoolean();
-            set.accept(now);
-            btn.setMessage(toggleText(label, now));
-            ModConfig.save();
-        }).dimensions(x, y, w, 20).build());
-    }
-
-    private static Text toggleText(String label, boolean value) {
-        return Text.literal(label + ": " + (value ? "WŁ." : "WYŁ."));
-    }
-
-    @Override
-    public void renderBackground(DrawContext context, int mouseX, int mouseY, float delta) {
-        // własne tło rysujemy w render()
-    }
-
-    @Override
-    public boolean shouldPause() {
-        return false;
-    }
-
-    @Override
-    public void render(DrawContext ctx, int mouseX, int mouseY, float delta) {
-        Theme th = Theme.byName(ModConfig.get().theme);
-
-        ctx.fill(0, 0, width, height, 0x90000000);
-        ctx.fill(px, py, px + pw, py + ph, th.bg);
-        ctx.fill(px, py, px + SIDEBAR, py + ph, th.sidebar);
-        ctx.fill(px, py, px + pw, py + 2, th.accent);
-        ctx.fill(px + SIDEBAR - 1, py, px + SIDEBAR, py + ph, th.accent);
-
-        ctx.drawText(textRenderer, "DripeuszekBomba", px + 8, py + 12, th.accent, true);
-
-        int cx = px + SIDEBAR + 12;
-        int cw = pw - SIDEBAR - 24;
-        int top = py + 34;
-        int bottom = py + ph - 8;
-        ctx.drawText(textRenderer, currentTab.label, cx, py + 12, th.accent, true);
-
-        switch (currentTab) {
-            case GRACZE -> renderPlayers(ctx, th, cx, top, cw, bottom);
-            case USTAWIENIA -> ctx.drawText(textRenderer, "Zmiany zapisują się automatycznie.",
-                    cx, top + 56, th.subText, false);
-            case MOTYWY -> ctx.drawText(textRenderer, "Wybierz kolor interfejsu.",
-                    cx, top + 24 * Theme.values().length + 4, th.subText, false);
-            case LICENCJA -> renderLicense(ctx, th, cx, top, cw, bottom);
+            // Jeśli jesteś Ownerem, pokaż sekcję tworzenia kluczy
+            if (ModConfig.playerRank.equals("OWNER")) {
+                context.drawText(this.textRenderer, "§eGenerator Kluczy (Tylko Owner):", contentX, contentY + 68, 0xFFFFFF, true);
+                if (!generatedKeyResult.isEmpty()) {
+                    context.drawText(this.textRenderer, "Klucz: §a" + generatedKeyResult, contentX, contentY + 115, 0xFFFFFF, true);
+                }
+            }
         }
 
-        super.render(ctx, mouseX, mouseY, delta);
-    }
-
-    private void renderPlayers(DrawContext ctx, Theme th, int x, int top, int w, int bottom) {
-        List<PlayerListEntry> players = List.of();
-        if (client != null && client.getNetworkHandler() != null) {
-            players = client.getNetworkHandler().getPlayerList().stream()
-                    .sorted(Comparator.comparing(e -> e.getProfile().getName().toLowerCase()))
-                    .toList();
-        }
-
-        ctx.drawText(textRenderer, "Online: " + players.size(), x + 70, py + 12, th.subText, false);
-
-        final int rowH = 14;
-        int areaH = bottom - top;
-        maxScroll = Math.max(0, players.size() * rowH - areaH);
-        scroll = MathHelper.clamp(scroll, 0, maxScroll);
-
-        ctx.enableScissor(x, top, x + w, bottom);
-        int y = top - (int) scroll;
-        int i = 0;
-        for (PlayerListEntry e : players) {
-            if ((i++ & 1) == 0) ctx.fill(x, y, x + w, y + rowH, 0x30FFFFFF);
-            ctx.drawText(textRenderer, e.getProfile().getName(), x + 4, y + 3, th.text, false);
-            String ping = e.getLatency() + " ms";
-            ctx.drawText(textRenderer, ping, x + w - 4 - textRenderer.getWidth(ping), y + 3, th.subText, false);
-            y += rowH;
-        }
-        ctx.disableScissor();
-
-        if (players.isEmpty()) {
-            ctx.drawText(textRenderer, "Brak graczy (wejdź do świata).", x, top + 2, th.subText, false);
-        }
-    }
-
-    private void renderLicense(DrawContext ctx, Theme th, int x, int top, int w, int bottom) {
-        List<OrderedText> lines = textRenderer.wrapLines(Text.literal(LICENSE), w - 6);
-        final int lineH = 10;
-        int areaH = bottom - top;
-        maxScroll = Math.max(0, lines.size() * lineH - areaH);
-        scroll = MathHelper.clamp(scroll, 0, maxScroll);
-
-        ctx.enableScissor(x, top, x + w, bottom);
-        int y = top - (int) scroll;
-        for (OrderedText line : lines) {
-            ctx.drawText(textRenderer, line, x, y, th.text, false);
-            y += lineH;
-        }
-        ctx.disableScissor();
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
-        scroll = MathHelper.clamp(scroll - verticalAmount * 14, 0, maxScroll);
-        return true;
+        super.render(context, mouseX, mouseY, delta);
     }
 }
