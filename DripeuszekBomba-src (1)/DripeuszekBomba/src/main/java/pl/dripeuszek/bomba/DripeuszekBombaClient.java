@@ -17,7 +17,7 @@ public class DripeuszekBombaClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        // 1. Rejestracja klawisza (domyślnie litera 'B') w kategorii "DripeuszekBomba"
+        // Rejestracja klawisza B do otwierania GUI
         openGuiKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                 "key.dripeuszekbomba.open",
                 InputUtil.Type.KEYSYM,
@@ -25,15 +25,13 @@ public class DripeuszekBombaClient implements ClientModInitializer {
                 "category.dripeuszekbomba.main"
         ));
 
-        // 2. Nasłuchiwanie wciśnięcia klawisza w każdej klatce gry
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (openGuiKey.wasPressed()) {
-                // Otwiera nasze GUI po wciśnięciu klawisza B
                 client.setScreen(new BombaScreen());
             }
         });
 
-        // 3. Rejestracja renderowania w świecie (Tracers i bomby)
+        // Rejestracja renderowania świata (Tracers / Stan ataku)
         WorldRenderEvents.LAST.register(context -> {
             MinecraftClient client = MinecraftClient.getInstance();
             if (client.world == null || client.player == null) return;
@@ -51,7 +49,7 @@ public class DripeuszekBombaClient implements ClientModInitializer {
 
                 if (isAttacking) {
                     long timeLeft = (BombaScreen.activeAttacks.get(uuid) - currentTime) / 1000;
-                    // Tutaj w przyszłości wyświetlimy tekst nad głową
+                    // Aktywny cel bomby – tutaj renderujemy tracers / etykietę nad głową
                 }
             }
         });
