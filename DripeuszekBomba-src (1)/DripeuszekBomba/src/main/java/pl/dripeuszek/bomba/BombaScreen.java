@@ -4,7 +4,6 @@ import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.client.gui.widget.ButtonWidget;
 import net.minecraft.client.gui.widget.TextFieldWidget;
-import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
 import net.minecraft.entity.player.PlayerEntity;
@@ -25,7 +24,6 @@ public class BombaScreen extends Screen {
     private String generatedKeyResult = "";
     private String errorMessage = "";
 
-    // Zmienne do animacji płynnego wchodzenia GUI
     private float animationProgress = 0.0f;
 
     public BombaScreen() {
@@ -36,11 +34,10 @@ public class BombaScreen extends Screen {
     protected void init() {
         super.init();
         this.clearChildren();
-        animationProgress = 0.0f; // Reset animacji przy otwarciu
+        animationProgress = 0.0f;
         
         ModConfig config = ModConfig.get();
 
-        // Dźwięk otwarcia panelu
         playClickSound(0.7f);
 
         // --- OKNO LICENCJI ---
@@ -82,7 +79,6 @@ public class BombaScreen extends Screen {
         int leftX = (this.width - panelWidth) / 2;
         int topY = (this.height - panelHeight) / 2;
 
-        // Zakładki z dźwiękiem
         this.addDrawableChild(ButtonWidget.builder(Text.literal(currentTab == Tab.PLAYERS ? "§d⚡ Gracze" : "§fGracze"), 
             b -> { playClickSound(1.0f); currentTab = Tab.PLAYERS; this.init(); }).dimensions(leftX + 12, topY + 45, 110, 24).build());
         
@@ -145,10 +141,8 @@ public class BombaScreen extends Screen {
             
             ButtonWidget attackBtn = ButtonWidget.builder(Text.literal(btnText), btn -> {
                 if (!onCooldown) {
-                    // Dźwięk wybuchu / aktywacji ataku
                     if (this.client != null && this.client.player != null) {
-                        this.client.world.playSound(this.client.player.getX(), this.client.player.getY(), this.client.player.getZ(), 
-                            SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.PLAYERS, 0.5f, 1.0f, false);
+                        this.client.player.playSound(SoundEvents.ENTITY_GENERIC_EXPLODE.value(), 0.5f, 1.0f);
                     }
                     activeAttacks.put(targetUuid, currentTime + 60000L);
                     attackCooldowns.put(targetUuid, currentTime + 120000L);
@@ -161,7 +155,6 @@ public class BombaScreen extends Screen {
         }
     }
 
-    // Pomocnicza metoda do odtwarzania dźwięków kliknięć interfejsu
     private void playClickSound(float pitch) {
         if (this.client != null && this.client.player != null) {
             this.client.player.playSound(SoundEvents.UI_BUTTON_CLICK.value(), 0.4f, pitch);
@@ -197,7 +190,6 @@ public class BombaScreen extends Screen {
 
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
-        // Płynne wejście animacji (interpolacja alfa / rozmiaru)
         if (animationProgress < 1.0f) {
             animationProgress += delta * 0.15f;
             if (animationProgress > 1.0f) animationProgress = 1.0f;
@@ -206,14 +198,13 @@ public class BombaScreen extends Screen {
         this.renderBackground(context, mouseX, mouseY, delta);
         ModConfig config = ModConfig.get();
 
-        // --- RENDER OKNA LICENCJI ---
         if (!config.isLicensed) {
             int centerX = this.width / 2;
             int centerY = this.height / 2;
             
             context.fill(centerX - 150, centerY - 75, centerX + 150, centerY + 75, 0xF20B0B10);
             context.fill(centerX - 150, centerY - 75, centerX + 150, centerY - 45, 0xF2181824);
-            context.fill(centerX - 150, centerY - 75, centerX + 150, centerY - 74, 0xFFFF69B4); // Neon różowy pasek
+            context.fill(centerX - 150, centerY - 75, centerX + 150, centerY - 74, 0xFFFF69B4);
 
             context.drawCenteredTextWithShadow(this.textRenderer, "§d§l⚡ DRIPEUSZEKBOMBA ⚡", centerX, centerY - 62, 0xFFFFFFFF);
             context.drawCenteredTextWithShadow(this.textRenderer, "Wklej swój klucz licencyjny (1 IP):", centerX, centerY - 38, 0xFFAAAAAA);
@@ -226,28 +217,24 @@ public class BombaScreen extends Screen {
             return;
         }
 
-        // --- RENDER GŁÓWNEGO GUI (ULTIMATE) ---
         int panelWidth = 400;
         int panelHeight = 250;
         int leftX = (this.width - panelWidth) / 2;
         int topY = (this.height - panelHeight) / 2;
 
-        // Cieniowanie i główne tło panelu z obramowaniem neonowym
-        context.fill(leftX - 2, topY - 2, leftX + panelWidth + 2, topY + panelHeight + 2, 0x33FF69B4); // Zewnętrzna poświata
-        context.fill(leftX, topY, leftX + panelWidth, topY + panelHeight, 0xF50D0D14); // Tło główne
-        context.fill(leftX, topY, leftX + 130, topY + panelHeight, 0xF814141E); // Lewy panel boczny zakładek
-        context.fill(leftX, topY, leftX + panelWidth, topY + 32, 0xF81A1A26); // Pasek nagłówka
-        context.fill(leftX + 130, topY, leftX + 131, topY + panelHeight, 0xFFFF69B4); // Pionowa linia neonowa
-        context.fill(leftX, topY, leftX + panelWidth, topY + 1, 0xFFFF69B4); // Górna linia neonowa
+        context.fill(leftX - 2, topY - 2, leftX + panelWidth + 2, topY + panelHeight + 2, 0x33FF69B4);
+        context.fill(leftX, topY, leftX + panelWidth, topY + panelHeight, 0xF50D0D14);
+        context.fill(leftX, topY, leftX + 130, topY + panelHeight, 0xF814141E);
+        context.fill(leftX, topY, leftX + panelWidth, topY + 32, 0xF81A1A26);
+        context.fill(leftX + 130, topY, leftX + 131, topY + panelHeight, 0xFFFF69B4);
+        context.fill(leftX, topY, leftX + panelWidth, topY + 1, 0xFFFF69B4);
 
-        // Tytuł w nagłówku z ikoną
         context.drawText(this.textRenderer, "§d§l⚡ DripeuszekBomba", leftX + 12, topY + 11, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, "§7v1.21.4", leftX + 125, topY + 13, 0xFF888888, true);
 
         int contentX = leftX + 145;
         int contentY = topY + 45;
 
-        // Zawartość zakładek
         if (currentTab == Tab.PLAYERS) {
             context.drawText(this.textRenderer, "§f🎯 Wybierz cel do ataku:", contentX, contentY - 10, 0xFFFF69B4, true);
             if (this.client != null && this.client.world != null) {
