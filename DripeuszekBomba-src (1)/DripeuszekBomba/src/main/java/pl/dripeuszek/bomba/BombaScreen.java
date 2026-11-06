@@ -15,8 +15,9 @@ public class BombaScreen extends Screen {
     public enum Tab { PLAYERS, SETTINGS, THEMES, LICENSE }
     private Tab currentTab = Tab.PLAYERS;
 
-    private static final HashMap<UUID, Long> attackCooldowns = new HashMap<>();
-    private static final HashMap<UUID, Long> activeAttacks = new HashMap<>();
+    // Publiczne mapy, aby system renderowania w świecie gry (tracers / tekst nad głową) miał do nich dostęp
+    public static final HashMap<UUID, Long> attackCooldowns = new HashMap<>();
+    public static final HashMap<UUID, Long> activeAttacks = new HashMap<>();
     private PlayerEntity selectedPlayer = null;
 
     private TextFieldWidget licenseField;
@@ -37,10 +38,8 @@ public class BombaScreen extends Screen {
         animationProgress = 0.0f;
         
         ModConfig config = ModConfig.get();
-
         playClickSound(0.7f);
 
-        // --- OKNO LICENCJI ---
         if (!config.isLicensed) {
             int centerX = this.width / 2;
             int centerY = this.height / 2;
@@ -73,27 +72,27 @@ public class BombaScreen extends Screen {
             return;
         }
 
-        // --- GŁÓWNE PANEL ULTIMATE GUI ---
-        int panelWidth = 400;
+        int panelWidth = 420;
         int panelHeight = 250;
         int leftX = (this.width - panelWidth) / 2;
         int topY = (this.height - panelHeight) / 2;
 
+        // Menu boczne zakładek
         this.addDrawableChild(ButtonWidget.builder(Text.literal(currentTab == Tab.PLAYERS ? "§d⚡ Gracze" : "§fGracze"), 
-            b -> { playClickSound(1.0f); currentTab = Tab.PLAYERS; this.init(); }).dimensions(leftX + 12, topY + 45, 110, 24).build());
+            b -> { playClickSound(1.0f); currentTab = Tab.PLAYERS; this.init(); }).dimensions(leftX + 12, topY + 45, 100, 24).build());
         
         this.addDrawableChild(ButtonWidget.builder(Text.literal(currentTab == Tab.SETTINGS ? "§d⚡ Ustawienia" : "§fUstawienia"), 
-            b -> { playClickSound(1.0f); currentTab = Tab.SETTINGS; this.init(); }).dimensions(leftX + 12, topY + 75, 110, 24).build());
+            b -> { playClickSound(1.0f); currentTab = Tab.SETTINGS; this.init(); }).dimensions(leftX + 12, topY + 75, 100, 24).build());
         
         this.addDrawableChild(ButtonWidget.builder(Text.literal(currentTab == Tab.THEMES ? "§d⚡ Motywy" : "§fMotywy"), 
-            b -> { playClickSound(1.0f); currentTab = Tab.THEMES; this.init(); }).dimensions(leftX + 12, topY + 105, 110, 24).build());
+            b -> { playClickSound(1.0f); currentTab = Tab.THEMES; this.init(); }).dimensions(leftX + 12, topY + 105, 100, 24).build());
         
         this.addDrawableChild(ButtonWidget.builder(Text.literal(currentTab == Tab.LICENSE ? "§d⚡ Licencja" : "§fLicencja"), 
-            b -> { playClickSound(1.0f); currentTab = Tab.LICENSE; this.init(); }).dimensions(leftX + 12, topY + 135, 110, 24).build());
+            b -> { playClickSound(1.0f); currentTab = Tab.LICENSE; this.init(); }).dimensions(leftX + 12, topY + 135, 100, 24).build());
 
         // Ustawienia
         if (currentTab == Tab.SETTINGS) {
-            int contentX = leftX + 135;
+            int contentX = leftX + 125;
             int contentY = topY + 45;
             this.addDrawableChild(ButtonWidget.builder(
                 Text.literal("Tracers na cele: " + (config.tracersEnabled ? "§aWŁĄCZONE" : "§cWYŁĄCZONE")),
@@ -103,15 +102,15 @@ public class BombaScreen extends Screen {
                     ModConfig.save();
                     this.init();
                 }
-            ).dimensions(contentX, contentY, 245, 24).build());
+            ).dimensions(contentX, contentY, 280, 24).build());
         }
 
-        // Panel Ownera - Generator kluczy
+        // Generator kluczy (Owner)
         if (currentTab == Tab.LICENSE && config.playerRank.equalsIgnoreCase("OWNER")) {
-            int contentX = leftX + 135;
+            int contentX = leftX + 125;
             int contentY = topY + 90;
             
-            this.targetUserField = new TextFieldWidget(this.textRenderer, contentX, contentY, 245, 20, Text.literal("Nick gracza"));
+            this.targetUserField = new TextFieldWidget(this.textRenderer, contentX, contentY, 280, 20, Text.literal("Nick gracza"));
             this.targetUserField.setMaxLength(32);
             this.targetUserField.setPlaceholder(Text.literal("Wpisz nick gracza docelowego..."));
             this.addDrawableChild(this.targetUserField);
@@ -125,30 +124,30 @@ public class BombaScreen extends Screen {
                     }
                     this.init();
                 }
-            }).dimensions(contentX, contentY + 26, 245, 22).build());
+            }).dimensions(contentX, contentY + 26, 280, 22).build());
         }
 
-        // Przycisk ataku w zakładce graczy
+        // --- PRZYCISK ATAKU W PRAWYM PANELU (ZAKŁADKA GRACZE) ---
         if (currentTab == Tab.PLAYERS && selectedPlayer != null) {
-            int contentX = leftX + 135;
-            int contentY = topY + 165;
+            int rightPanelX = leftX + 265; // Prawa kolumna w gui
+            int contentY = topY + 130;
             UUID targetUuid = selectedPlayer.getUuid();
             long currentTime = System.currentTimeMillis();
             boolean onCooldown = attackCooldowns.containsKey(targetUuid) && attackCooldowns.get(targetUuid) > currentTime;
             boolean isAttacking = activeAttacks.containsKey(targetUuid) && activeAttacks.get(targetUuid) > currentTime;
 
-            String btnText = onCooldown ? "§c⏳ COOLDOWN (CZEKAJ)" : (isAttacking ? "§e⚠ ATAK W TOKU (60s)" : "§4🔥 URUCHOM BOMBE (60s)");
+            String btnText = onCooldown ? "§c⏳ COOLDOWN" : (isAttacking ? "§e⚠ ATAK W TOKU" : "§4🔥 WYŚLIJ BOMBE");
             
             ButtonWidget attackBtn = ButtonWidget.builder(Text.literal(btnText), btn -> {
                 if (!onCooldown) {
                     if (this.client != null && this.client.player != null) {
                         this.client.player.playSound(SoundEvents.ENTITY_GENERIC_EXPLODE.value(), 0.5f, 1.0f);
                     }
-                    activeAttacks.put(targetUuid, currentTime + 60000L);
-                    attackCooldowns.put(targetUuid, currentTime + 120000L);
+                    activeAttacks.put(targetUuid, currentTime + 60000L); // 60 sekund ataku
+                    attackCooldowns.put(targetUuid, currentTime + 120000L); // 120 sekund cooldownu
                     this.init();
                 }
-            }).dimensions(contentX, contentY, 245, 26).build();
+            }).dimensions(rightPanelX, contentY, 145, 28).build();
 
             attackBtn.active = !onCooldown;
             this.addDrawableChild(attackBtn);
@@ -164,18 +163,19 @@ public class BombaScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && ModConfig.get().isLicensed && currentTab == Tab.PLAYERS) {
-            int panelWidth = 400;
+            int panelWidth = 420;
             int panelHeight = 250;
             int leftX = (this.width - panelWidth) / 2;
             int topY = (this.height - panelHeight) / 2;
-            int contentX = leftX + 135;
-            int contentY = topY + 45;
+            int listX = leftX + 120;
+            int listY = topY + 45;
 
             if (this.client != null && this.client.world != null) {
-                int yOffset = contentY;
+                int yOffset = listY;
                 for (PlayerEntity p : this.client.world.getPlayers()) {
                     if (p == this.client.player) continue;
-                    if (mouseX >= contentX && mouseX <= contentX + 245 && mouseY >= yOffset && mouseY <= yOffset + 20) {
+                    // Kliknięcie w element listy graczy (szerokość 135 px)
+                    if (mouseX >= listX && mouseX <= listX + 135 && mouseY >= yOffset && mouseY <= yOffset + 20) {
                         playClickSound(1.5f);
                         selectedPlayer = p;
                         this.init();
@@ -217,26 +217,27 @@ public class BombaScreen extends Screen {
             return;
         }
 
-        int panelWidth = 400;
+        int panelWidth = 420;
         int panelHeight = 250;
         int leftX = (this.width - panelWidth) / 2;
         int topY = (this.height - panelHeight) / 2;
 
         context.fill(leftX - 2, topY - 2, leftX + panelWidth + 2, topY + panelHeight + 2, 0x33FF69B4);
         context.fill(leftX, topY, leftX + panelWidth, topY + panelHeight, 0xF50D0D14);
-        context.fill(leftX, topY, leftX + 130, topY + panelHeight, 0xF814141E);
+        context.fill(leftX, topY, leftX + 115, topY + panelHeight, 0xF814141E); // Lewe menu zakładek
         context.fill(leftX, topY, leftX + panelWidth, topY + 32, 0xF81A1A26);
-        context.fill(leftX + 130, topY, leftX + 131, topY + panelHeight, 0xFFFF69B4);
+        context.fill(leftX + 115, topY, leftX + 116, topY + panelHeight, 0xFFFF69B4);
         context.fill(leftX, topY, leftX + panelWidth, topY + 1, 0xFFFF69B4);
 
         context.drawText(this.textRenderer, "§d§l⚡ DripeuszekBomba", leftX + 12, topY + 11, 0xFFFFFFFF, true);
         context.drawText(this.textRenderer, "§7v1.21.4", leftX + 125, topY + 13, 0xFF888888, true);
 
-        int contentX = leftX + 145;
+        int contentX = leftX + 125;
         int contentY = topY + 45;
 
+        // --- ZAKŁADKA GRACZE (LISTA PO LEWEJ, PANEL INFORMACYJNY PO PRAWEJ) ---
         if (currentTab == Tab.PLAYERS) {
-            context.drawText(this.textRenderer, "§f🎯 Wybierz cel do ataku:", contentX, contentY - 10, 0xFFFF69B4, true);
+            context.drawText(this.textRenderer, "§f🎯 Gracze:", contentX, contentY - 10, 0xFFFF69B4, true);
             if (this.client != null && this.client.world != null) {
                 int yOffset = contentY + 5;
                 for (PlayerEntity p : this.client.world.getPlayers()) {
@@ -244,12 +245,32 @@ public class BombaScreen extends Screen {
                     boolean isSelected = (selectedPlayer == p);
                     int bgColor = isSelected ? 0x66FF69B4 : 0x22FFFFFF;
                     
-                    context.fill(contentX, yOffset, contentX + 245, yOffset + 20, bgColor);
-                    context.drawText(this.textRenderer, "§f👤 " + p.getName().getString(), contentX + 8, yOffset + 6, 0xFFFFFFFF, true);
+                    context.fill(contentX, yOffset, contentX + 135, yOffset + 20, bgColor);
+                    context.drawText(this.textRenderer, "§f👤 " + p.getName().getString(), contentX + 6, yOffset + 6, 0xFFFFFFFF, true);
                     yOffset += 24;
                 }
+
+                // RENDEROWANIE PANELU SZCZEGÓŁÓW PO PRAWEJ STRONIE
+                int rightPanelX = leftX + 265;
+                context.fill(rightPanelX - 5, contentY - 15, rightPanelX + 145, topY + 230, 0x331E1E2A);
+                
                 if (selectedPlayer != null) {
-                    context.drawText(this.textRenderer, "Wybrany cel: §d" + selectedPlayer.getName().getString(), contentX, topY + 215, 0xFFFFFF, true);
+                    UUID targetUuid = selectedPlayer.getUuid();
+                    long currentTime = System.currentTimeMillis();
+                    boolean isAttacking = activeAttacks.containsKey(targetUuid) && activeAttacks.get(targetUuid) > currentTime;
+                    long timeLeft = isAttacking ? (activeAttacks.get(targetUuid) - currentTime) / 1000 : 0;
+
+                    context.drawText(this.textRenderer, "§d§l[ INFORMACJE ]", rightPanelX, contentY, 0xFFFFFFFF, true);
+                    context.drawText(this.textRenderer, "Cel: §b" + selectedPlayer.getName().getString(), rightPanelX, contentY + 20, 0xFFFFFF, true);
+                    context.drawText(this.textRenderer, "Status: " + (isAttacking ? "§c§lBOMBA ( " + timeLeft + "s )" : "§aBEZPIECZNY"), rightPanelX, contentY + 35, 0xFFFFFF, true);
+                    
+                    double dist = this.client.player != null ? this.client.player.distanceTo(selectedPlayer) : 0;
+                    context.drawText(this.textRenderer, "Dystans: §e" + String.format("%.1f", dist) + "m", rightPanelX, contentY + 50, 0xFFFFFF, true);
+                } else {
+                    context.drawText(this.textRenderer, "§7Wybierz gracza", rightPanelX, contentY, 0x888888, true);
+                    context.drawText(this.textRenderer, "§7z listy obok,", rightPanelX, contentY + 12, 0x888888, true);
+                    context.drawText(this.textRenderer, "§7aby zobaczyć", rightPanelX, contentY + 24, 0x888888, true);
+                    context.drawText(this.textRenderer, "§7szczegóły i atak.", rightPanelX, contentY + 36, 0x888888, true);
                 }
             }
         } 
@@ -260,7 +281,6 @@ public class BombaScreen extends Screen {
         else if (currentTab == Tab.THEMES) {
             context.drawText(this.textRenderer, "§l🎨 Motywy i Personalizacja", contentX, contentY - 10, 0xFFFF69B4, true);
             context.drawText(this.textRenderer, "Aktywny motyw: §dDark Neon Pink (Ultimate)", contentX, contentY + 10, 0xFFFFFFFF, true);
-            context.drawText(this.textRenderer, "§7Płynne animacje i efekty dźwiękowe aktywne.", contentX, contentY + 25, 0xFFAAAAAA, true);
         } 
         else if (currentTab == Tab.LICENSE) {
             context.drawText(this.textRenderer, "§l🔒 Status Licencji i System", contentX, contentY - 10, 0xFFFF69B4, true);
@@ -272,7 +292,7 @@ public class BombaScreen extends Screen {
                 if (!generatedKeyResult.isEmpty()) {
                     context.drawText(this.textRenderer, "Wygenerowany klucz:", contentX, contentY + 115, 0xAAAAAA, true);
                     context.drawText(this.textRenderer, "§a" + generatedKeyResult, contentX, contentY + 127, 0xFFFFFF, true);
-                    context.drawText(this.textRenderer, "§a✔ Skopiowano automatycznie do schowka!", contentX, contentY + 142, 0x55FF55, true);
+                    context.drawText(this.textRenderer, "§a✔ Skopiowano do schowka!", contentX, contentY + 142, 0x55FF55, true);
                 }
             }
         }
