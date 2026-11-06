@@ -23,7 +23,7 @@ public class ModConfig {
     public boolean isLicensed = false;
     public String playerRank = "DEFAULT";
     public String playerName = "Player";
-    public String boundIpOrId = ""; // Zabezpieczenie: klucz przypisany do konkretnego urządzenia/IP
+    public String boundIpOrId = "";
 
     public static ModConfig get() {
         return instance;
@@ -54,34 +54,35 @@ public class ModConfig {
     public static boolean validateKey(String key, String username) {
         if (key == null || key.isEmpty()) return false;
 
-        // Twoje konto OWNER ma zawsze dostęp
-        if (username.equalsIgnoreCase("dripeuszek")) {
-            instance.playerRank = "OWNER";
-            return true;
-        }
+        // Oczekiwany klucz wygenerowany dla tego konkretnego nicku
+        String expectedKey = generateKeyForUser(username, "TWÓJ_TAJNY_SEKRET_ADMINA");
 
-        // Sprawdzenie poprawności klucza wygenerowanego dla gracza
-        String expectedKey = "BOMBA-" + Math.abs((username + "_MOJ_TAJNY_SEKRET").hashCode()) + "-VIP";
         if (key.equals(expectedKey)) {
-            // Blokada jednego IP / urządzenia: jeśli klucz nie był jeszcze nigdzie przypisany lub jest przypisany do nas
+            // Zabezpieczenie jednego urządzenia / IP
             String currentDeviceId = System.getProperty("user.name") + "_" + System.getProperty("os.name");
             
             if (instance.boundIpOrId.isEmpty()) {
-                instance.boundIpOrId = currentDeviceId; // Przypisuje do pierwszego lepszego IP/urządzenia
+                instance.boundIpOrId = currentDeviceId;
                 save();
             } else if (!instance.boundIpOrId.equals(currentDeviceId)) {
-                // Klucz był już użyty na innym urządzeniu/IP!
+                // Klucz próbuje być użyty na innym komputerze/IP
                 return false;
             }
 
-            instance.playerRank = "DEFAULT";
+            // Nadawanie rangi Ownera jeśli to Twój nick, w przeciwnym razie VIP/Default
+            if (username.equalsIgnoreCase("dripeuszek")) {
+                instance.playerRank = "OWNER";
+            } else {
+                instance.playerRank = "VIP";
+            }
             return true;
         }
-        return false;
+
+        return false; // Jeśli klucz nie pasuje, odrzuca od razu!
     }
 
     public static String generateKeyForUser(String targetUser, String secretAdminToken) {
         if (!secretAdminToken.equals("TWÓJ_TAJNY_SEKRET_ADMINA")) return "Błąd autoryzacji!";
-        return "BOMBA-" + Math.abs((targetUser + "_MOJ_TAJNY_SEKRET").hashCode()) + "-VIP";
+        return "BOMBA-" + Math.abs((targetUser.trim() + "_MOJ_TAJNY_SEKRET").hashCode()) + "-VIP";
     }
 }
