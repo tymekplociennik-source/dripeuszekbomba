@@ -14,12 +14,11 @@ public class BombaScreen extends Screen {
     public enum Tab { PLAYERS, SETTINGS, THEMES, LICENSE }
     private Tab currentTab = Tab.PLAYERS;
 
-    // System ataków i cooldownów (60s ataku / 60s cooldownu)
     private static final HashMap<UUID, Long> attackCooldowns = new HashMap<>();
     private static final HashMap<UUID, Long> activeAttacks = new HashMap<>();
     private PlayerEntity selectedPlayer = null;
 
-    // Pola do generowania kluczy w zakładce Licencja (tylko dla Ownera)
+    private TextFieldWidget licenseField;
     private TextFieldWidget targetUserField;
     private String generatedKeyResult = "";
 
@@ -30,31 +29,59 @@ public class BombaScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        ModConfig config = ModConfig.get();
+
+        // Jeśli brak licencji -> Wyświetl okno żądające klucza
+        if (!config.isLicensed) {
+            int centerX = this.width / 2;
+            int centerY = this.height / 2;
+
+            this.licenseField = new TextFieldWidget(this.textRenderer, centerX - 110, centerY - 15, 220, 22, Text.literal("Klucz"));
+            this.licenseField.setMaxLength(256);
+            this.licenseField.setText(config.licenseKey);
+            this.addDrawableChild(this.licenseField);
+
+            this.addDrawableChild(ButtonWidget.builder(Text.literal("§aZweryfikuj Licencję"), b -> {
+                String enteredKey = licenseField.getText();
+                String playerName = this.client != null && this.client.player != null ? this.client.player.getName().getString() : "Player";
+                
+                config.licenseKey = enteredKey;
+                config.playerName = playerName;
+                
+                if (ModConfig.validateKey(enteredKey, playerName)) {
+                    config.isLicensed = true;
+                    ModConfig.save();
+                    this.init(); // Odświeża ekran do normalnego GUI
+                }
+            }).dimensions(centerX - 110, centerY + 15, 220, 24).build());
+            return;
+        }
+
+        // --- GŁÓWNE GUI ---
         int leftX = this.width / 2 - 160;
         int topY = this.height / 2 - 100;
 
-        // Przyciski zakładek po lewej stronie (nowoczesny styl)
         this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fGracze"), b -> { currentTab = Tab.PLAYERS; this.init(); }).dimensions(leftX, topY + 40, 110, 22).build());
         this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fUstawienia"), b -> { currentTab = Tab.SETTINGS; this.init(); }).dimensions(leftX, topY + 68, 110, 22).build());
         this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fMotywy"), b -> { currentTab = Tab.THEMES; this.init(); }).dimensions(leftX, topY + 96, 110, 22).build());
         this.addDrawableChild(ButtonWidget.builder(Text.literal("§7> §fLicencja"), b -> { currentTab = Tab.LICENSE; this.init(); }).dimensions(leftX, topY + 124, 110, 22).build());
 
-        // Zakładka Ustawienia: Przycisk Tracers
+        // Ustawienia -> Tracers
         if (currentTab == Tab.SETTINGS) {
             int contentX = leftX + 130;
             int contentY = topY + 40;
             this.addDrawableChild(ButtonWidget.builder(
-                Text.literal("Tracers na atakowanych: " + (ModConfig.tracersEnabled ? "§aWŁĄCZONE" : "§cWYŁĄCZONE")),
+                Text.literal("Tracers na atakowanych: " + (config.tracersEnabled ? "§aWŁĄCZONE" : "§cWYŁĄCZONE")),
                 b -> {
-                    ModConfig.tracersEnabled = !ModConfig.tracersEnabled;
+                    config.tracersEnabled = !config.tracersEnabled;
                     ModConfig.save();
                     this.init();
                 }
             ).dimensions(contentX, contentY, 180, 24).build());
         }
 
-        // Zakładka Licencja: Generator kluczy (widoczny tylko jeśli jesteś OWNEREM)
-        if (currentTab == Tab.LICENSE && ModConfig.playerRank.equals("OWNER")) {
+        // Licencja -> Generator kluczy (Tylko dla Ownera)
+        if (currentTab == Tab.LICENSE && config.playerRank.equals("OWNER")) {
             int contentX = leftX + 130;
             int contentY = topY + 90;
             
@@ -70,7 +97,7 @@ public class BombaScreen extends Screen {
             }).dimensions(contentX, contentY + 25, 180, 20).build());
         }
 
-        // Zakładka Gracze: Przycisk panelu ATAK dla wybranego gracza
+        // Gracze -> Panel ATAK (60s ataku / 60s cooldownu)
         if (currentTab == Tab.PLAYERS && selectedPlayer != null) {
             int contentX = leftX + 130;
             int contentY = topY + 140;
@@ -83,7 +110,7 @@ public class BombaScreen extends Screen {
             
             this.addDrawableChild(ButtonWidget.builder(Text.literal(btnText), b -> {
                 if (!onCooldown) {
-                    activeAttacks.put(targetUuid, currentTime + 60000L); // Atak na 60 sekund
+                    activeAttacks.put(targetUuid, currentTime + 60000L); // 60 sekund ataku
                     attackCooldowns.put(targetUuid, currentTime + 120000L); // 60s ataku + 60s cooldownu
                     this.init();
                 }
@@ -94,44 +121,49 @@ public class BombaScreen extends Screen {
     @Override
     public void render(DrawContext context, int mouseX, int mouseY, float delta) {
         this.renderBackground(context);
+        ModConfig config = ModConfig.get();
 
+        // Renderowanie okna logowania licencji
+        if (!config.isLicensed) {
+            int centerX = this.width / 2;
+            int centerY = this.height / 2;
+            context.fill(centerX - 130, centerY - 70, centerX + 130, centerY + 65, 0xF2121218);
+            context.fill(centerX - 130, centerY - 70, centerX + 130, centerY - 45, 0xF21E1E2A);
+            context.fill(centerX - 130, centerY - 70, centerX + 130, centerY - 69, 0xFFFF69B4);
+            context.drawCenteredTextWithShadow(this.textRenderer, "§d§lDripeuszekBomba §7| Licencja", centerX, centerY - 58, 0xFFFFFFFF);
+            context.drawCenteredTextWithShadow(this.textRenderer, "Wpisz klucz, aby odblokować mod:", centerX, centerY - 35, 0xFFAAAAAA);
+            super.render(context, mouseX, mouseY, delta);
+            return;
+        }
+
+        // Renderowanie głównego GUI
         int leftX = this.width / 2 - 160;
         int topY = this.height / 2 - 100;
         int width = 320;
         int height = 210;
 
-        // Nowoczesne tło główne (ciemny matowy grafit z neonową ramką w stylu Twojego moda)
-        context.fill(leftX, topY, leftX + width, topY + height, 0xF2121218); // Główne tło
-        context.fill(leftX, topY, leftX + 125, topY + height, 0xF2181822); // Panel boczny
-        context.fill(leftX, topY, leftX + width, topY + 25, 0xF21E1E2A); // Pasek górny
-
-        // Linia rozdzielająca i akcenty
-        context.fill(leftX + 125, topY, leftX + 126, topY + height, 0xFFFF69B4); // Różowa linia z Twojego motywu
+        context.fill(leftX, topY, leftX + width, topY + height, 0xF2121218);
+        context.fill(leftX, topY, leftX + 125, topY + height, 0xF2181822);
+        context.fill(leftX, topY, leftX + width, topY + 25, 0xF21E1E2A);
+        context.fill(leftX + 125, topY, leftX + 126, topY + height, 0xFFFF69B4);
         context.fill(leftX, topY, leftX + width, topY + 1, 0xFFFF69B4);
 
-        // Nagłówek i tytuł
         context.drawText(this.textRenderer, "§d§lDripeuszekBomba", leftX + 12, topY + 8, 0xFFFFFFFF, true);
 
         int contentX = leftX + 135;
         int contentY = topY + 35;
 
-        // RENDEROWANIE ZAWARTOŚCI W ZALEŻNOŚCI OD ZAKŁADKI
         if (currentTab == Tab.PLAYERS) {
             context.drawText(this.textRenderer, "§fOnline Gracze:", contentX, contentY, 0xFFFF69B4, true);
-            
             if (this.client != null && this.client.world != null) {
                 int yOffset = contentY + 15;
                 for (PlayerEntity p : this.client.world.getPlayers()) {
                     if (p == this.client.player) continue;
                     boolean isSelected = (selectedPlayer == p);
-                    
-                    // Podświetlenie wybranego gracza
                     int bgColor = isSelected ? 0x55FF69B4 : 0x22FFFFFF;
                     context.fill(contentX, yOffset, contentX + 175, yOffset + 18, bgColor);
-                    
                     context.drawText(this.textRenderer, "§f" + p.getName().getString(), contentX + 6, yOffset + 5, 0xFFFFFFFF, true);
                     
-                    // Obsługa kliknięcia myszką w listę graczy
                     if (mouseX >= contentX && mouseX <= contentX + 175 && mouseY >= yOffset && mouseY <= yOffset + 18) {
                         if (this.client.mouse.wasButtonReleased(0)) {
                             selectedPlayer = p;
@@ -140,7 +172,6 @@ public class BombaScreen extends Screen {
                     }
                     yOffset += 22;
                 }
-
                 if (selectedPlayer != null) {
                     context.drawText(this.textRenderer, "Wybrano: §d" + selectedPlayer.getName().getString(), contentX, topY + 120, 0xFFFFFF, true);
                 }
@@ -148,7 +179,6 @@ public class BombaScreen extends Screen {
         } 
         else if (currentTab == Tab.SETTINGS) {
             context.drawText(this.textRenderer, "§lUstawienia Globalne", contentX, contentY, 0xFFFF69B4, true);
-            context.drawText(this.textRenderer, "§7Tutaj zarządzasz funkcjami pomocniczymi.", contentX, contentY + 15, 0x888888, true);
         } 
         else if (currentTab == Tab.THEMES) {
             context.drawText(this.textRenderer, "§lMotywy i Styl", contentX, contentY, 0xFFFF69B4, true);
@@ -156,13 +186,12 @@ public class BombaScreen extends Screen {
         } 
         else if (currentTab == Tab.LICENSE) {
             context.drawText(this.textRenderer, "§lPanel Licencji", contentX, contentY, 0xFFFF69B4, true);
-            context.drawText(this.textRenderer, "Nick: §b" + ModConfig.playerName, contentX, contentY + 20, 0xFFFFFFFF, true);
-            context.drawText(this.textRenderer, "Ranga: §d" + ModConfig.playerRank, contentX, contentY + 35, 0xFFFFFFFF, true);
+            context.drawText(this.textRenderer, "Nick: §b" + config.playerName, contentX, contentY + 20, 0xFFFFFFFF, true);
+            context.drawText(this.textRenderer, "Ranga: §d" + config.playerRank, contentX, contentY + 35, 0xFFFFFFFF, true);
             context.drawText(this.textRenderer, "Status: §aZweryfikowana", contentX, contentY + 50, 0xFFFFFFFF, true);
 
-            // Jeśli jesteś Ownerem, pokaż sekcję tworzenia kluczy
-            if (ModConfig.playerRank.equals("OWNER")) {
-                context.drawText(this.textRenderer, "§eGenerator Kluczy (Tylko Owner):", contentX, contentY + 68, 0xFFFFFF, true);
+            if (config.playerRank.equals("OWNER")) {
+                context.drawText(this.textRenderer, "§eGenerator Kluczy:", contentX, contentY + 68, 0xFFFFFF, true);
                 if (!generatedKeyResult.isEmpty()) {
                     context.drawText(this.textRenderer, "Klucz: §a" + generatedKeyResult, contentX, contentY + 115, 0xFFFFFF, true);
                 }
