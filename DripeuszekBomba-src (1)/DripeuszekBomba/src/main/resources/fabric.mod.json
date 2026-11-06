@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "dripeuszekbomba",
+  "version": "${version}",
+  "name": "DripeuszekBomba",
+  "description": "GUI z zakładkami: Gracze, Ustawienia, Motywy, Licencja. Otwierane klawiszem \".\"",
+  "authors": ["Dripeuszek"],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": ["pl.dripeuszek.bomba.DripeuszekBombaClient"]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.9",
+    "minecraft": "~1.21.4",
+    "java": ">=21",
+    "fabric-api": "*"
+  }
+}
